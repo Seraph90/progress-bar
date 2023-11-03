@@ -1,0 +1,22 @@
+{
+    "name": "seraph90/progress-bar",
+    "description": "PHP CLI progress bar",
+    "version": "1.0.0",
+    "type": "library",
+    "license": "Apache-2.0",
+    "authors": [
+        {
+            "name": "Alex Heifetz",
+            "email": "Seraph90Seraph@gmail.com"
+        }
+    ],
+    "minimum-stability": "stable",
+    "require": {
+        "php": ">=7.4"
+    },
+    "autoload": {
+        "psr-4": {
+            "Heifetz\\": "src/"
+        }
+    }
+}
