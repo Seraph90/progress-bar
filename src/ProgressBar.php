@@ -8,7 +8,8 @@ class ProgressBar
 {
 
     private float $startTime;
-    private float $subTime;
+
+    private float $lastRenderTime;
     private int $renderDelay = 250;
 
     private int $counter = 0;
@@ -104,15 +105,22 @@ class ProgressBar
 
     private function needRender(): bool
     {
-        $isRenderTime = microtime(true) - $this->subTime < $this->renderDelay / 1000;
+        $isRenderTime = microtime(true) - $this->lastRenderTime < $this->renderDelay / 1000;
         $isFinish = $this->counter === $this->total;
 
         return $isRenderTime || $isFinish;
     }
 
+    private function getShortLoaderIndex(): int
+    {
+        $period = floor((microtime(true) - $this->startTime) * 10);
+
+        return $period % count(self::SHORT_LOADER);
+    }
+
     private function drawProgressBarLine(): void
     {
-        $this->subTime = microtime(true);
+        $this->lastRenderTime = microtime(true);
 
         $percent = $this->getPercent();
 
@@ -125,8 +133,7 @@ class ProgressBar
 
         $percents = (int) round(($this->screenLength - $this->subSize) / 100 * $percent);
         if ($this->useLoader) {
-            $period = floor((microtime(true) - $this->startTime) * 10);
-            $progressBar .= self::SHORT_LOADER[$period % count(self::SHORT_LOADER)];
+            $progressBar .= $this->counter === $this->total ? self::SHORT_LOADER_FINISH : self::SHORT_LOADER[$this->getShortLoaderIndex()];
         } else {
             $progressBar .= str_repeat('█', $percents + 1);
             $progressBar .= str_repeat('▒', intval(max($this->screenLength - $this->subSize - $percents, 0)));
@@ -146,7 +153,7 @@ class ProgressBar
     {
         $this->total = $total;
         $this->startTime = microtime(true);
-        $this->subTime = microtime(true);
+        $this->lastRenderTime = microtime(true);
 
         $this->totalSize = strlen((string) $total);
 
