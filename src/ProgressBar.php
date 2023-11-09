@@ -8,6 +8,8 @@ class ProgressBar
 {
 
     private float $startTime;
+    private float $subTime;
+    private int $renderDelay = 250;
 
     private int $counter = 0;
     private int $total;
@@ -100,41 +102,18 @@ class ProgressBar
         echo "\033[0;0H"; // Set cursor top left corner
     }
 
-    public function __construct(int $total)
+    private function needRender(): bool
     {
-        $this->total = $total;
-        $this->startTime = microtime(true);
+        $isRenderTime = microtime(true) - $this->subTime < $this->renderDelay / 1000;
+        $isFinish = $this->counter === $this->total;
 
-        $this->totalSize = strlen((string) $total);
-
-        $this->calcScreenSizes();
-        $this->calcSubSize();
-
-        pcntl_signal(SIGWINCH, function ($signal) {
-            if ($signal == SIGWINCH) {
-                $this->clearTerminal();
-                $this->calcScreenSizes();
-                $this->calcSubSize();
-            }
-        });
-
-        echo self::HIDE_CARET; // Скрыть курсор
+        return $isRenderTime || $isFinish;
     }
 
-    private function clearLine(): void
+    private function drawProgressBarLine(): void
     {
-        echo "\r" . str_repeat(' ', $this->screenLength);
-    }
+        $this->subTime = microtime(true);
 
-    public function advance(): void
-    {
-        if ($this->counter >= $this->total) {
-            return;
-        }
-
-        pcntl_signal_dispatch();
-
-        $this->counter++;
         $percent = $this->getPercent();
 
         $progressBar = "\r" . self::FONT_NORMAL;
@@ -163,8 +142,56 @@ class ProgressBar
         echo $progressBar;
     }
 
+    public function __construct(int $total)
+    {
+        $this->total = $total;
+        $this->startTime = microtime(true);
+        $this->subTime = microtime(true);
+
+        $this->totalSize = strlen((string) $total);
+
+        $this->calcScreenSizes();
+        $this->calcSubSize();
+
+        pcntl_signal(SIGWINCH, function ($signal) {
+            if ($signal == SIGWINCH) {
+                $this->clearTerminal();
+                $this->calcScreenSizes();
+                $this->calcSubSize();
+            }
+        });
+
+        echo self::HIDE_CARET; // Скрыть курсор
+    }
+
+    public function setRenderDelay(int $microSeconds): self
+    {
+        $this->renderDelay = $microSeconds;
+
+        return $this;
+    }
+
+    public function advance(): void
+    {
+        if ($this->counter >= $this->total) {
+            return;
+        }
+
+        pcntl_signal_dispatch();
+
+        $this->counter++;
+
+        if ($this->needRender()) {
+            return;
+        }
+
+        $this->drawProgressBarLine();
+    }
+
     public function finish(): void
     {
+        $this->drawProgressBarLine();
+
         echo self::SHOW_CARET . PHP_EOL;
     }
 
