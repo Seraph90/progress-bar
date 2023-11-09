@@ -9,8 +9,11 @@ $pb = new ProgressBar($count);
 $pb->setRenderDelay(100);
 
 for ($i = 0; $i < $count; $i++) {
-    $pb->advance();
-    usleep(1000);
+    if (mt_rand(0, 5)) {
+        $pb->advance();
+    } else {
+        $pb->advanceError();
+    }
 }
 
 $pb->finish();

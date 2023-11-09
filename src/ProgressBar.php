@@ -13,6 +13,7 @@ class ProgressBar
     private int $renderDelay = 250;
 
     private int $counter = 0;
+    private int $errorCounter = 0;
     private int $total;
 
     private int $totalSize;
@@ -39,6 +40,20 @@ class ProgressBar
     private bool $showPercent = true;
     private bool $useLoader = false;
 
+    private function getTotalCounter(): float
+    {
+        return $this->counter + $this->errorCounter;
+    }
+
+    private function getTotalPercent(): float
+    {
+        if (empty($this->total)) {
+            return 0;
+        }
+
+        return round($this->getTotalCounter() / $this->total * 100, 2);
+    }
+
     private function getPercent(): float
     {
         if (empty($this->total)) {
@@ -48,11 +63,20 @@ class ProgressBar
         return round($this->counter / $this->total * 100, 2);
     }
 
+    private function getErrorPercent(): float
+    {
+        if (empty($this->total)) {
+            return 0;
+        }
+
+        return round($this->errorCounter / $this->total * 100, 2);
+    }
+
     private function getEta(): string
     {
         $currentTime = microtime(true) - $this->startTime;
 
-        $seconds = $currentTime / $this->counter * $this->total - $currentTime;
+        $seconds = $currentTime / $this->getTotalCounter() * $this->total - $currentTime;
 
         return 'ETA: ' . sprintf('%02d:%02d:%02d', ($seconds / 3600), ($seconds / 60 % 60), $seconds % 60);
     }
@@ -103,12 +127,16 @@ class ProgressBar
         echo "\033[0;0H"; // Set cursor top left corner
     }
 
+    private function isFinished(): bool
+    {
+        return $this->getTotalCounter() >= $this->total;
+    }
+
     private function needRender(): bool
     {
         $isRenderTime = microtime(true) - $this->lastRenderTime < $this->renderDelay / 1000;
-        $isFinish = $this->counter === $this->total;
 
-        return $isRenderTime || $isFinish;
+        return $isRenderTime || $this->isFinished();
     }
 
     private function getShortLoaderIndex(): int
@@ -122,21 +150,28 @@ class ProgressBar
     {
         $this->lastRenderTime = microtime(true);
 
+        $totalPercent = $this->getTotalPercent();
         $percent = $this->getPercent();
+        $errorPercent = $this->getErrorPercent();
 
         $progressBar = "\r" . self::FONT_NORMAL;
         if ($this->showCounter) {
             $progressBar .= str_pad((string) $this->counter, $this->totalSize, ' ', STR_PAD_LEFT) . '/' . $this->total . ' ';
         }
 
-        $progressBar .= self::FONT_GREEN;;
+        $progressBar .= self::FONT_GREEN;
 
-        $percents = (int) round(($this->screenLength - $this->subSize) / 100 * $percent);
         if ($this->useLoader) {
             $progressBar .= $this->counter === $this->total ? self::SHORT_LOADER_FINISH : self::SHORT_LOADER[$this->getShortLoaderIndex()];
         } else {
+            $totalPercent = (int) round(($this->screenLength - $this->subSize) / 100 * $totalPercent);
+            $percents = (int) round(($this->screenLength - $this->subSize) / 100 * $percent);
             $progressBar .= str_repeat('█', $percents + 1);
-            $progressBar .= str_repeat('▒', intval(max($this->screenLength - $this->subSize - $percents, 0)));
+            $errorPercents = (int) round(($this->screenLength - $this->subSize) / 100 * $errorPercent);
+            $progressBar .= self::FONT_RED;
+            $progressBar .= str_repeat('█', $errorPercents + 1);
+            $progressBar .= self::FONT_GREEN;
+            $progressBar .= str_repeat('▒', intval(max($this->screenLength - $this->subSize - $totalPercent, 0)));
             if ($this->showEta) {
                 $progressBar .= ' ' . $this->getEta();
             }
@@ -178,21 +213,35 @@ class ProgressBar
         return $this;
     }
 
-    public function advance(): void
+    private function step(bool $isError = false)
     {
-        if ($this->counter >= $this->total) {
+        if ($this->isFinished()) {
             return;
         }
 
         pcntl_signal_dispatch();
 
-        $this->counter++;
+        if ($isError) {
+            $this->errorCounter++;
+        } else {
+            $this->counter++;
+        }
 
         if ($this->needRender()) {
             return;
         }
 
         $this->drawProgressBarLine();
+    }
+
+    public function advance(): void
+    {
+        $this->step();
+    }
+
+    public function advanceError(): void
+    {
+        $this->step(true);
     }
 
     public function finish(): void
