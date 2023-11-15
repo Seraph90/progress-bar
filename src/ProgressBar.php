@@ -60,7 +60,7 @@ class ProgressBar
             return 0;
         }
 
-        return round($this->counter / $this->total * 100, 2);
+        return ceil($this->counter / $this->total * 100);
     }
 
     private function getErrorPercent(): float
@@ -69,7 +69,7 @@ class ProgressBar
             return 0;
         }
 
-        return round($this->errorCounter / $this->total * 100, 2);
+        return floor($this->errorCounter / $this->total * 100);
     }
 
     private function getEta(): string
@@ -164,14 +164,20 @@ class ProgressBar
         if ($this->useLoader) {
             $progressBar .= $this->counter === $this->total ? self::SHORT_LOADER_FINISH : self::SHORT_LOADER[$this->getShortLoaderIndex()];
         } else {
-            $totalPercent = (int) round(($this->screenLength - $this->subSize) / 100 * $totalPercent);
-            $percents = (int) round(($this->screenLength - $this->subSize) / 100 * $percent);
-            $progressBar .= str_repeat('█', $percents + 1);
-            $errorPercents = (int) round(($this->screenLength - $this->subSize) / 100 * $errorPercent);
-            $progressBar .= self::FONT_RED;
-            $progressBar .= str_repeat('█', $errorPercents + 1);
-            $progressBar .= self::FONT_GREEN;
-            $progressBar .= str_repeat('▒', intval(max($this->screenLength - $this->subSize - $totalPercent, 0)));
+            $fullBar = $this->screenLength - $this->subSize;
+            $oneBarPercent = $fullBar / 100;
+
+            $percentsBars = (int) ceil($oneBarPercent * $percent);
+            $errorPercentsBars = (int) floor($oneBarPercent * $errorPercent);
+            $emptyBars = $fullBar - $percentsBars - $errorPercentsBars;
+
+            $progressBar .= str_repeat('█', $percentsBars);
+            if (!empty($errorPercentsBars)) {
+                $progressBar .= self::FONT_RED;
+                $progressBar .= str_repeat('█', $errorPercentsBars);
+                $progressBar .= self::FONT_GREEN;
+            }
+            $progressBar .= str_repeat('▒', $emptyBars);
             if ($this->showEta) {
                 $progressBar .= ' ' . $this->getEta();
             }
