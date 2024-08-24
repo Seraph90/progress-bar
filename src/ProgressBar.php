@@ -170,6 +170,7 @@ class ProgressBar
             $percentsBars = (int) ceil($oneBarPercent * $percent);
             $errorPercentsBars = (int) floor($oneBarPercent * $errorPercent);
             $emptyBars = $fullBar - $percentsBars - $errorPercentsBars;
+            $emptyBars = max(0, $emptyBars);
 
             $progressBar .= str_repeat('█', $percentsBars);
             if (!empty($errorPercentsBars)) {
