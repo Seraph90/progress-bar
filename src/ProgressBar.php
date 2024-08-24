@@ -45,15 +45,6 @@ class ProgressBar
         return $this->counter + $this->errorCounter;
     }
 
-    private function getTotalPercent(): float
-    {
-        if (empty($this->total)) {
-            return 0;
-        }
-
-        return round($this->getTotalCounter() / $this->total * 100, 2);
-    }
-
     private function getPercent(): float
     {
         if (empty($this->total)) {
@@ -150,7 +141,6 @@ class ProgressBar
     {
         $this->lastRenderTime = microtime(true);
 
-        $totalPercent = $this->getTotalPercent();
         $percent = $this->getPercent();
         $errorPercent = $this->getErrorPercent();
 
