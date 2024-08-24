@@ -1,5 +1,5 @@
 {
-    "name": "seraph90/progress-bar",
+    "name": "alex-heifetz/progress-bar",
     "description": "PHP CLI progress bar",
     "version": "1.3.2",
     "type": "library",

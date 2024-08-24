@@ -1,9 +1,9 @@
 # ProgressBar – Class for displaying a progressbar in your console applications
 
-[![Latest Stable Version](http://poser.pugx.org/seraph90/progress-bar/v)](https://packagist.org/packages/seraph90/progress-bar)
-[![Total Downloads](http://poser.pugx.org/seraph90/progress-bar/downloads)](https://packagist.org/packages/seraph90/progress-bar)
-[![License](http://poser.pugx.org/seraph90/progress-bar/license)](https://packagist.org/packages/seraph90/progress-bar)
-[![PHP Version Require](http://poser.pugx.org/seraph90/progress-bar/require/php)](https://packagist.org/packages/seraph90/progress-bar)
+![GitHub Release](https://img.shields.io/github/v/release/alex-heifetz/progress-bar)
+![GitHub Downloads (all assets, all releases)](https://img.shields.io/packagist/dt/alex-heifetz/progress-bar)
+![GitHub License](https://img.shields.io/github/license/alex-heifetz/progress-bar)
+![Packagist Dependency Version](https://img.shields.io/packagist/dependency-v/alex-heifetz/progress-bar/php)
 
 ![Gif](https://github.com/Seraph90/my-gifs/blob/main/gifs/error-wait.gif?raw=true)
 
@@ -23,7 +23,7 @@ This library was created to solve these problems.
 Just add this line to your `composer.json` file:
 
 ```json
-"seraph90/progress-bar": "^1.2"
+"alex-heifetz/progress-bar": "^1.2"
 ```
 
 or run
