@@ -10,11 +10,12 @@ class ProgressBar
     private float $startTime;
 
     private float $lastRenderTime;
-    private int $renderDelay = 250;
+    private int $renderDelayMilliseconds = 250;
 
     private int $counter = 0;
     private int $errorCounter = 0;
     private int $total;
+    private int $lastRenderedTotalCounter = -1;
 
     private int $totalSize;
     private int $screenLength;
@@ -39,6 +40,9 @@ class ProgressBar
     private bool $showEta = true;
     private bool $showPercent = true;
     private bool $useLoader = false;
+    private bool $isCursorHidden = false;
+    private bool $isFinished = false;
+    private bool $separateErrors = true;
 
     private function getTotalCounter(): float
     {
@@ -51,32 +55,79 @@ class ProgressBar
             return 0;
         }
 
-        return ceil($this->counter / $this->total * 100);
+        return min(100, $this->getTotalCounter() / $this->total * 100);
     }
 
-    private function getErrorPercent(): float
+    private function getCounterSize(): int
     {
-        if (empty($this->total)) {
-            return 0;
+        if (!$this->separateErrors) {
+            return ($this->totalSize + 1) * 2;
         }
 
-        return floor($this->errorCounter / $this->total * 100);
+        return ($this->totalSize * 3) + 3;
+    }
+
+    private function getCounterText(): string
+    {
+        if (!$this->separateErrors) {
+            return str_pad((string) $this->getTotalCounter(), $this->totalSize, ' ', STR_PAD_LEFT) . '/' . $this->total . ' ';
+        }
+
+        return self::FONT_GREEN
+            . str_pad((string) $this->counter, $this->totalSize, ' ', STR_PAD_LEFT)
+            . self::FONT_NORMAL
+            . '/'
+            . self::FONT_RED
+            . str_pad((string) $this->errorCounter, $this->totalSize, ' ', STR_PAD_LEFT)
+            . self::FONT_NORMAL
+            . '/'
+            . $this->total
+            . ' ';
     }
 
     private function getEta(): string
     {
+        if ($this->getTotalCounter() === 0.0) {
+            return 'ETA: 00:00:00';
+        }
+
         $currentTime = microtime(true) - $this->startTime;
 
-        $seconds = $currentTime / $this->getTotalCounter() * $this->total - $currentTime;
+        $seconds = (int) max(0, round($currentTime / $this->getTotalCounter() * $this->total - $currentTime));
 
-        return 'ETA: ' . sprintf('%02d:%02d:%02d', ($seconds / 3600), ($seconds / 60 % 60), $seconds % 60);
+        return 'ETA: ' . sprintf(
+                '%02d:%02d:%02d',
+                intdiv($seconds, 3600),
+                intdiv($seconds % 3600, 60),
+                $seconds % 60
+            );
     }
 
     private function calcScreenSizes(): void
     {
-        $screenSizes = explode(' ', trim(shell_exec('stty size')));
-        // Get screen width
-        $this->screenLength = (int) ($screenSizes[1] ?? 80);
+        $this->screenLength = 80;
+
+        if (function_exists('getenv')) {
+            $columns = (int) getenv('COLUMNS');
+            if ($columns > 0) {
+                $this->screenLength = $columns;
+            }
+        }
+
+        if (!function_exists('shell_exec')) {
+            return;
+        }
+
+        $output = shell_exec('stty size 2>/dev/null');
+        if (!is_string($output)) {
+            return;
+        }
+
+        $screenSizes = preg_split('/\s+/', trim($output));
+        $screenLength = (int) ($screenSizes[1] ?? 0);
+        if ($screenLength > 0) {
+            $this->screenLength = $screenLength;
+        }
     }
 
     /** Calculate occupied space in line */
@@ -101,9 +152,9 @@ class ProgressBar
             $this->subSize += 1 + self::PERCENT_SIZE;
         }
 
-        if (($this->subSize + ($this->totalSize + 1) * 2) < $this->screenLength - 2) {
+        if (($this->subSize + $this->getCounterSize()) < $this->screenLength - 2) {
             $this->showCounter = true;
-            $this->subSize += ($this->totalSize + 1) * 2;
+            $this->subSize += $this->getCounterSize();
         }
 
         if ($this->subSize + 1 + self::ETA_SIZE < $this->screenLength - 2) {
@@ -112,7 +163,7 @@ class ProgressBar
         }
     }
 
-    private function clearTerminal()
+    private function clearTerminal(): void
     {
         echo "\033[2J"; // Clear all screen
         echo "\033[0;0H"; // Set cursor top left corner
@@ -123,9 +174,9 @@ class ProgressBar
         return $this->getTotalCounter() >= $this->total;
     }
 
-    private function needRender(): bool
+    private function shouldRender(): bool
     {
-        $isRenderTime = microtime(true) - $this->lastRenderTime < $this->renderDelay / 1000;
+        $isRenderTime = microtime(true) - $this->lastRenderTime >= $this->renderDelayMilliseconds / 1000;
 
         return $isRenderTime || $this->isFinished();
     }
@@ -140,26 +191,26 @@ class ProgressBar
     private function drawProgressBarLine(): void
     {
         $this->lastRenderTime = microtime(true);
+        $this->lastRenderedTotalCounter = (int) $this->getTotalCounter();
 
         $percent = $this->getPercent();
-        $errorPercent = $this->getErrorPercent();
 
         $progressBar = "\r" . self::FONT_NORMAL;
         if ($this->showCounter) {
-            $progressBar .= str_pad((string) $this->counter, $this->totalSize, ' ', STR_PAD_LEFT) . '/' . $this->total . ' ';
+            $progressBar .= $this->getCounterText();
         }
 
         $progressBar .= self::FONT_GREEN;
 
         if ($this->useLoader) {
-            $progressBar .= $this->counter === $this->total ? self::SHORT_LOADER_FINISH : self::SHORT_LOADER[$this->getShortLoaderIndex()];
+            $progressBar .= $this->isFinished() ? self::SHORT_LOADER_FINISH : self::SHORT_LOADER[$this->getShortLoaderIndex()];
         } else {
             $fullBar = $this->screenLength - $this->subSize;
-            $oneBarPercent = $fullBar / 100;
-
-            $percentsBars = (int) ceil($oneBarPercent * $percent);
-            $errorPercentsBars = (int) floor($oneBarPercent * $errorPercent);
-            $emptyBars = $fullBar - $percentsBars - $errorPercentsBars;
+            $completedBars = (int) floor($fullBar * $this->getTotalCounter() / $this->total);
+            $successCounter = $this->separateErrors ? $this->counter : $this->getTotalCounter();
+            $percentsBars = (int) floor($fullBar * $successCounter / $this->total);
+            $errorPercentsBars = $this->separateErrors ? $completedBars - $percentsBars : 0;
+            $emptyBars = $fullBar - $completedBars;
             $emptyBars = max(0, $emptyBars);
 
             $progressBar .= str_repeat('█', $percentsBars);
@@ -183,6 +234,10 @@ class ProgressBar
 
     public function __construct(int $total)
     {
+        if ($total <= 0) {
+            throw new \InvalidArgumentException('Total count must be greater than zero.');
+        }
+
         $this->total = $total;
         $this->startTime = microtime(true);
         $this->lastRenderTime = microtime(true);
@@ -200,17 +255,25 @@ class ProgressBar
             }
         });
 
-        echo self::HIDE_CARET; // Скрыть курсор
+        $this->hideCursor();
     }
 
-    public function setRenderDelay(int $microSeconds): self
+    public function setRenderDelay(int $milliseconds): self
     {
-        $this->renderDelay = $microSeconds;
+        $this->renderDelayMilliseconds = max(0, $milliseconds);
 
         return $this;
     }
 
-    private function step(bool $isError = false)
+    public function setSeparateErrors(bool $enabled): self
+    {
+        $this->separateErrors = $enabled;
+        $this->calcSubSize();
+
+        return $this;
+    }
+
+    private function step(bool $isError = false): void
     {
         if ($this->isFinished()) {
             return;
@@ -218,17 +281,15 @@ class ProgressBar
 
         pcntl_signal_dispatch();
 
-        if ($isError) {
+        if ($isError && $this->separateErrors) {
             $this->errorCounter++;
         } else {
             $this->counter++;
         }
 
-        if ($this->needRender()) {
-            return;
+        if ($this->shouldRender()) {
+            $this->drawProgressBarLine();
         }
-
-        $this->drawProgressBarLine();
     }
 
     public function advance(): void
@@ -243,9 +304,43 @@ class ProgressBar
 
     public function finish(): void
     {
-        $this->drawProgressBarLine();
+        if ($this->isFinished) {
+            return;
+        }
 
-        echo self::SHOW_CARET . PHP_EOL;
+        if ($this->lastRenderedTotalCounter !== (int) $this->getTotalCounter()) {
+            $this->drawProgressBarLine();
+        }
+
+        $this->showCursor();
+        echo PHP_EOL;
+
+        $this->isFinished = true;
+    }
+
+    public function __destruct()
+    {
+        $this->showCursor();
+    }
+
+    private function hideCursor(): void
+    {
+        if ($this->isCursorHidden) {
+            return;
+        }
+
+        echo self::HIDE_CARET;
+        $this->isCursorHidden = true;
+    }
+
+    private function showCursor(): void
+    {
+        if (!$this->isCursorHidden) {
+            return;
+        }
+
+        echo self::SHOW_CARET;
+        $this->isCursorHidden = false;
     }
 
 }

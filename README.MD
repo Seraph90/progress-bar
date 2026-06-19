@@ -1,35 +1,44 @@
-# ProgressBar – Class for displaying a progressbar in your console applications
+# ProgressBar - PHP CLI progress bar
 
 ![GitHub Release](https://img.shields.io/github/v/release/alex-heifetz/progress-bar)
 ![GitHub Downloads (all assets, all releases)](https://img.shields.io/packagist/dt/alex-heifetz/progress-bar)
 ![GitHub License](https://img.shields.io/github/license/alex-heifetz/progress-bar)
 ![Packagist Dependency Version](https://img.shields.io/packagist/dependency-v/alex-heifetz/progress-bar/php)
 
+
 ![Gif](https://github.com/Seraph90/my-gifs/blob/main/gifs/error-wait.gif?raw=true)
 
 ## Features
 - Compatible with PHP 7.4 and later
 - Displays estimated completion time
-- It is possible to divide into 2 parts, for example with successful iterations and with erroneous ones
-- Flexibly responds to changes in window width
-- It is possible to configure the data update time
+- Separates successful and failed iterations
+- Responds to terminal width changes
+- Lets you configure the redraw interval
 
 ## Why you might need this
-Sometimes when running commands and long processes or testing commands, you want to see that the process is moving and not hanging in the middle.
-I would also like to understand the approximate completion time of the process.
-This library was created to solve these problems.
+When running long CLI commands, background jobs, or test scripts, it is useful to see that the process is still moving and estimate when it will finish.
+This library provides a compact progress bar for those cases.
+
+## Requirements
+- PHP 7.4+
+- `ext-pcntl`
+- A terminal with ANSI escape sequence support
 
 ## Installation & loading
-Just add this line to your `composer.json` file:
-
-```json
-"alex-heifetz/progress-bar": "^1.2"
-```
-
-or run
+Install the package with Composer:
 
 ```sh
-composer require seraph90/progress-bar
+composer require alex-heifetz/progress-bar
+```
+
+Or add it to your `composer.json` manually:
+
+```json
+{
+    "require": {
+        "alex-heifetz/progress-bar": "^1.4"
+    }
+}
 ```
 
 ## A Simple Example
@@ -45,12 +54,15 @@ require 'vendor/autoload.php';
 
 $count = 12000000;
 
-// Create an instance;
-// Passing total count of iterations 
+// Create an instance with the total number of iterations.
 $pb = new ProgressBar($count);
 
-// Set the delay time between redrawings
+// Set the redraw delay in milliseconds.
 $pb->setRenderDelay(100);
+
+// Optional: count errors separately.
+// Disable this if failed iterations should be counted as completed iterations.
+$pb->setSeparateErrors(true);
 
 for ($i = 0; $i < $count; $i++) {
     if (mt_rand(0, 5)) {
@@ -66,4 +78,4 @@ for ($i = 0; $i < $count; $i++) {
 $pb->finish();
 ```
 
-![ProgresBar](https://github.com/Seraph90/my-gifs/blob/main/gifs/ProgressBarWithErrors.gif?raw=true)
+![ProgressBar](https://github.com/Seraph90/my-gifs/blob/main/gifs/ProgressBarWithErrors.gif?raw=true)
